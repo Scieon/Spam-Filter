@@ -1,0 +1,98 @@
+import os
+import re
+import Parser as p
+import math
+
+directory_in_str = "../files/test/"
+
+
+def filter_word_length():
+    for word, word_count in p.vocab.copy().items():
+        if len(word) <= 2 or len(word) >= 9:
+            filtered_word = p.vocab.pop(word)
+            p.spam_word_count -= filtered_word['spam']
+            p.ham_word_count -= filtered_word['ham']
+
+
+def parse_test_files():
+    directory = os.fsencode(directory_in_str)
+
+    ret = []
+
+    for file in os.listdir(directory):
+        testing_set = {}
+        filename = os.fsdecode(file)
+
+        if filename.endswith(".txt"):
+            # print(filename)
+            txt_file = directory_in_str + filename
+            f = open(txt_file, 'r')
+            try:
+                # print(f.read())
+                data = f.read().lower()
+                data = re.split('[^a-zA-Z]', data)
+            except UnicodeDecodeError:
+                f = open(txt_file, 'r', encoding='cp850')
+                data = f.read().lower()
+                data = re.split('[^a-zA-Z]', data)
+
+            for word in data:
+                if word not in testing_set:
+                    testing_set[word] = 1
+                else:
+                    testing_set[word] = testing_set[word] + 1
+
+            # score_ham = math.log10(p.ham_word_count / p.ham_count)  # Should be number of spam emails
+            # score_spam = math.log10(p.spam_word_count / p.spam_count)
+
+            score_ham = math.log10(p.ham_count / p.ham_count + p.spam_count)  # Should be number of spam emails
+            score_spam = math.log10(p.spam_count / p.ham_count + p.spam_count)
+
+            for word, word_count in testing_set.items():
+                # Skip the words that we have not seen in training set
+                if word in p.vocab:
+                    score_spam += math.log10(word_count / p.spam_word_count)  # Should be number of spam words
+                    score_ham += math.log10(word_count / p.ham_word_count)
+
+            if 'ham' in filename:
+                classification = 'ham'
+            else:
+                classification = 'spam'
+            ret.append({'filename': filename, 'spam_score': score_spam, 'ham_score': score_ham,
+                        'classification': classification})
+        else:
+            continue
+
+    return ret
+
+
+def write_baseline_file():
+    f = open("wordlength-result.txt", 'w+')
+    line = 1
+
+    results = parse_test_files()
+
+    for result in results:
+        spam_score = str(result['spam_score'])
+        ham_score = str(result['ham_score'])
+        correct_classification = result['classification']
+
+        if result['spam_score'] > result['ham_score']:
+            classification = 'spam'
+        else:
+            classification = 'ham'
+
+        if classification == correct_classification:
+            classification_result = 'right'
+        else:
+            classification_result = 'wrong'
+
+        f.write(str(line) + ' ' + result['filename'] + ' ' + classification + ' ' + ham_score + ' ' + spam_score + ' '
+                + correct_classification + ' ' + classification_result + '\n')
+        line += 1
+
+
+filter_word_length()
+write_baseline_file()
+
+print('Done classifier3')
